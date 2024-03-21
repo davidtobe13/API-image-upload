@@ -10,6 +10,7 @@ const {DateTime} = require('luxon')
 // Radius of the Earth in kilometers
 const OPENCAGE_API_KEY = process.env.OPENCAGE_API_KEY
 const ipApiKey = process.env.ipApiKey
+const myIpKey = process.env.myIpKey
 
 
 // Register user function
@@ -160,14 +161,17 @@ exports.createImage = async (req, res) => {
 
         // Get user's current location from IP geolocation
         let location;
-        const ipResponse = await axios.get(`https://api.ipgeolocation.io/ipgeo?apiKey=${ipApiKey}`);
+        const ipResponse = await axios.get(`https://api.ipdata.co?api-key=${myIpKey}`);
+        // const ipResponse = await axios.get(`https://api.ipgeolocation.io/ipgeo?apiKey=${ipApiKey}`);
         const { latitude, longitude } = ipResponse.data;
-        console.log(ipResponse)
+        console.log(latitude, longitude)
 
         // Fetch the location based on latitude and longitude
         const response = await axios.get(`https://api.opencagedata.com/geocode/v1/json?key=${OPENCAGE_API_KEY}&q=${latitude},${longitude}`);
         if (response.data && response.data.results && response.data.results.length > 0) {
             location = response.data.results[0].formatted;
+
+            console.log(location);
         } else {
             location = 'Location not available';
         }
