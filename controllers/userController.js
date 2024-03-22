@@ -6,6 +6,7 @@ const cloudinary = require('../utils/cloudinary')
 const axios = require('axios');
 
 const {DateTime} = require('luxon')
+const createImageModel = require("../models/createImageModel")
 
 // Radius of the Earth in kilometers
 const OPENCAGE_API_KEY = process.env.OPENCAGE_API_KEY
@@ -137,11 +138,14 @@ exports.signOut = async(req,res)=>{
 }
 
 
+
+
 exports.createImage = async (req, res) => {
     try {
         const { userId } = req.user;
 
-        if (!userId) {
+        const user = await userModel.findById(userId);
+        if (!user) {
             return res.status(404).json({
                 error: 'User not found'
             });
@@ -159,25 +163,24 @@ exports.createImage = async (req, res) => {
             profileImage = result.secure_url;
         }
 
-        // Get user's current location from IP geolocation
         let location;
         const ipResponse = await axios.get(`https://api.ipdata.co?api-key=${myIpKey}`);
         // const ipResponse = await axios.get(`https://api.ipgeolocation.io/ipgeo?apiKey=${ipApiKey}`);
         const { latitude, longitude } = ipResponse.data;
-        console.log(latitude, longitude)
+        // console.log(latitude, longitude)
 
         // Fetch the location based on latitude and longitude
         const response = await axios.get(`https://api.opencagedata.com/geocode/v1/json?key=${OPENCAGE_API_KEY}&q=${latitude},${longitude}`);
         if (response.data && response.data.results && response.data.results.length > 0) {
             location = response.data.results[0].formatted;
 
-            console.log(location);
+            // console.log(location);
         } else {
             location = 'Location not available';
         }
 
-        // Create a new user document with the updated information
-        const newUser = await userModel.create({
+        // Create a new image document with the updated information
+        const newImage = await createImageModel.create({
             userId,
             profileImage,
             date,
@@ -185,22 +188,20 @@ exports.createImage = async (req, res) => {
             location
         });
 
-        if (!newUser) {
+        if (!newImage) {
             return res.status(404).json({
-                error: 'Failed to create user document'
+                error: 'Failed to create image document'
             });
         }
 
         res.status(200).json({
-            message: 'Successfully created user document with image and location',
-            user: newUser
+            message: 'Successfully created image document with image and location',
+            image: newImage
         });
     } catch (error) {
-        console.error('Error creating user document:', error);
+        console.error('Error creating image document:', error);
         res.status(500).json({
             error: 'Internal server error'
         });
     }
 };
-
-
