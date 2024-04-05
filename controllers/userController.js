@@ -5,12 +5,11 @@ const jwt = require("jsonwebtoken")
 const cloudinary = require('../utils/cloudinary')
 const axios = require('axios');
 
-const {DateTime} = require('luxon')
+// const {DateTime} = require('luxon')
 const createImageModel = require("../models/createImageModel")
 
 // Radius of the Earth in kilometers
 const OPENCAGE_API_KEY = process.env.OPENCAGE_API_KEY
-const ipApiKey = process.env.ipApiKey
 const myIpKey = process.env.myIpKey
 
 
@@ -152,16 +151,14 @@ exports.createImage = async (req, res) => {
         }
 
         // Get the current date and time
-        const date = DateTime.now().toLocaleString({ weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
-        const time = DateTime.now().toLocaleString({ hour: '2-digit', minute: '2-digit' });
+        const date = new Date().toLocaleString('en-NG', {timeZone: 'Africa/Lagos', ...{ weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }});
+        const time = new Date().toLocaleString('en-NG', {timeZone: 'Africa/Lagos', ...{hour: '2-digit', minute: '2-digit', hourCycle: 'h24' }});
 
-        // Upload image to Cloudinary if available
-        let profileImage;
-        if (req.file) {
-            const file = req.file.path;
-            const result = await cloudinary.uploader.upload(file);
-            profileImage = result.secure_url;
-        }
+        // const date = DateTime.now().toLocaleString({ weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
+        // const time = DateTime.now().toLocaleString({ hour: '2-digit', minute: '2-digit' });
+
+        const decodedDate = decodeURIComponent(date)
+
 
         let location;
         const ipResponse = await axios.get(`https://api.ipdata.co?api-key=${myIpKey}`);
@@ -179,29 +176,80 @@ exports.createImage = async (req, res) => {
             location = 'Location not available';
         }
 
+        let mark 
+
+        if (time <= '9:45'){
+            mark = 20
+        }
+
+        else if(time <= '10:00'){
+            mark = 10
+        }
+        
+        else if(time >= '10:00'){
+            mark = 0
+        }
+
+        const decodedLoc = decodeURIComponent(location)
+
+
+         // Upload image to Cloudinary if available
+         let profileImage;
+         if (req.file) {
+             const file = req.file.path;
+             // const result = await cloudinary.uploader.upload(file);
+
+        const text = `Date: ${decodedDate}\nTime: ${time}\nLocation: ${decodedLoc}`;
+        console.log(text)
+
+        // Upload image with text overlay
+        const result = await cloudinary.uploader.upload(file, {
+            transformation: [ 
+                {
+                    width: 1000,
+                    height: 150,
+                    gravity: "south_east",
+                    overlay: {
+                        font_family: "arial",
+                        font_size: 16,
+                        text: text,
+                        background: "sample",
+                        padding: 50,
+                        margin: 50
+                    },
+                    color: "white"
+                }
+            ]
+        });
+    
+        profileImage = result.secure_url;
+    }
+    
+
         // Create a new image document with the updated information
         const newImage = await createImageModel.create({
             userId,
             profileImage,
             date,
             time,
-            location
+            location,
+            mark
         });
 
         if (!newImage) {
             return res.status(404).json({
                 error: 'Failed to create image document'
             });
-        }
+        } 
 
         res.status(200).json({
             message: 'Successfully created image document with image and location',
             image: newImage
         });
     } catch (error) {
-        console.error('Error creating image document:', error);
+        console.error('Error creating image document:', error.message);
         res.status(500).json({
-            error: 'Internal server error'
+            error: `Internal server error: ${error.message}`
         });
     }
 };

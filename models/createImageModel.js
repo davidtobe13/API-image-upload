@@ -16,7 +16,10 @@ const createImageSchema = new mongoose.Schema({
     },       
     time:{
         type:String,
-        }
+    },
+    mark:{
+        type:Number,
+    },
 })
 
 const createImageModel = mongoose.model("createImage",createImageSchema)
