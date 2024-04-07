@@ -149,14 +149,18 @@ exports.createImage = async (req, res) => {
                 error: 'User not found'
             });
         }
-
+        
+        // Check if the user has already fired the endpoint today
+        const today = new Date().toLocaleString('en-NG', {timeZone: 'Africa/Lagos', ...{ weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }});
+        const previousImages = await createImageModel.find({ userId: userId, date: today });
+        if (previousImages.length > 0) {
+            return res.status(400).json({
+                error: 'You are only allowed to upload once a day'
+            });
+        }
         // Get the current date and time
         const date = new Date().toLocaleString('en-NG', {timeZone: 'Africa/Lagos', ...{ weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }});
         const time = new Date().toLocaleString('en-NG', {timeZone: 'Africa/Lagos', ...{hour: '2-digit', minute: '2-digit', hourCycle: 'h24' }});
-
-        // const date = DateTime.now().toLocaleString({ weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' });
-        // const time = DateTime.now().toLocaleString({ hour: '2-digit', minute: '2-digit' });
-
         const decodedDate = decodeURIComponent(date)
 
 
@@ -176,22 +180,17 @@ exports.createImage = async (req, res) => {
             location = 'Location not available';
         }
 
-        let mark 
+        let mark;
 
-        if (time <= '9:45'){
-            mark = 20
-        }
-
-        else if(time <= '10:00'){
-            mark = 10
-        }
-        
-        else if(time >= '10:00'){
-            mark = 0
+        if (time <= '09:45') {
+            mark = 20;
+        } else if (time <= '10:00') {
+            mark = 10;
+        } else {
+            mark = 0;
         }
 
         const decodedLoc = decodeURIComponent(location)
-
 
          // Upload image to Cloudinary if available
          let profileImage;
@@ -200,7 +199,6 @@ exports.createImage = async (req, res) => {
              // const result = await cloudinary.uploader.upload(file);
 
         const text = `Date: ${decodedDate}\nTime: ${time}\nLocation: ${decodedLoc}`;
-        console.log(text)
 
         // Upload image with text overlay
         const result = await cloudinary.uploader.upload(file, {
@@ -248,6 +246,81 @@ exports.createImage = async (req, res) => {
         });
     } catch (error) {
         console.error('Error creating image document:', error.message);
+        res.status(500).json({
+            error: `Internal server error: ${error.message}`
+        });
+    }
+};
+
+
+
+exports.deleteAllImages = async (req, res) => {
+    try {
+        const { userId } = req.user;
+
+        // Check if the user exists
+        const user = await userModel.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                error: 'User not found'
+            });
+        }
+
+        // Retrieve profile images associated with the user
+        const images = await createImageModel.find({ userId: userId }, 'profileImage');
+
+        // Check if user has any images
+        if (images.length === 0) {
+            return res.status(404).json({
+                error: 'No images found for the user'
+            });
+        }
+
+        // Extract public IDs of images
+        const publicIds = images.map(image => {
+            const publicId = image.profileImage.split('/').pop().split('.')[0];
+            return publicId;
+        });
+
+        // Delete images from Cloudinary
+        await cloudinary.api.delete_resources(publicIds);
+
+        // Delete all images associated with the user from the database
+        await createImageModel.deleteMany({ userId: userId });
+
+        res.status(200).json({
+            message: 'All images deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting images:', error.message);
+        res.status(500).json({
+            error: `Internal server error: ${error.message}`
+        });
+    }
+};
+
+
+exports.getAllImages = async (req, res) => {
+    try {
+        const { userId } = req.user;
+
+        // Check if the user exists
+        const user = await userModel.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                error: 'User not found'
+            });
+        }
+
+        // Find all images associated with the user
+        const images = await createImageModel.find({ userId: userId });
+
+        res.status(200).json({
+            message: 'Successfully retrieved all images for the user',
+            images: images
+        });
+    } catch (error) {
+        console.error('Error retrieving images:', error.message);
         res.status(500).json({
             error: `Internal server error: ${error.message}`
         });
